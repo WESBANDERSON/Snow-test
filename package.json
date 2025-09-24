@@ -7,9 +7,12 @@
     "start": "ng serve",
     "build": "ng build",
     "build:prod": "ng build --configuration production --base-href=/servicenow-esc-replica/",
+    "build:gh-pages": "ng build --configuration production --base-href=/servicenow-esc-replica/ --output-path=dist",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "deploy": "ng deploy --base-href=/servicenow-esc-replica/"
+    "predeploy": "npm run build:gh-pages",
+    "deploy": "npx angular-cli-ghpages --dir=dist/servicenow-esc-replica --no-silent",
+    "deploy:ci": "npx angular-cli-ghpages --dir=dist/servicenow-esc-replica --no-silent --name=\"GitHub Actions\" --email=\"actions@github.com\""
   },
   "dependencies": {
     "@angular/animations": "^17.0.0",
