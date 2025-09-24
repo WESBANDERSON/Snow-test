@@ -1,0 +1,111 @@
+{
+  "catalog_item": {
+    "name": "Standard Laptop Request",
+    "short_description": "Request a standard business laptop",
+    "description": "This catalog item allows employees to request a standard business laptop with pre-approved configurations. Designed to comply with ServiceNow ESC limitations.",
+    "category": "Hardware",
+    "active": true,
+    "user_criteria": "role=employee,role=contractor", 
+    "variables": [
+      {
+        "name": "req_business_justification",
+        "type": "string",
+        "question": "Business Justification",
+        "mandatory": true,
+        "max_length": 4000,
+        "help_text": "Explain why you need this laptop for business purposes"
+      },
+      {
+        "name": "req_laptop_type",
+        "type": "select",
+        "question": "Laptop Type",
+        "mandatory": true,
+        "options": [
+          {"label": "Standard Business", "value": "standard"},
+          {"label": "Developer Workstation", "value": "developer"},
+          {"label": "Executive", "value": "executive"}
+        ],
+        "help_text": "Select the type of laptop that meets your needs"
+      },
+      {
+        "name": "opt_preferred_brand",
+        "type": "select",
+        "question": "Preferred Brand",
+        "mandatory": false,
+        "relevant_condition": "req_laptop_type=standard",
+        "options": [
+          {"label": "Dell", "value": "dell"},
+          {"label": "HP", "value": "hp"},
+          {"label": "Lenovo", "value": "lenovo"}
+        ]
+      },
+      {
+        "name": "opt_delivery_location",
+        "type": "string",
+        "question": "Delivery Location",
+        "mandatory": false,
+        "max_length": 255,
+        "default_value": "{{user.location}}",
+        "help_text": "Where should the laptop be delivered?"
+      },
+      {
+        "name": "opt_rush_delivery",
+        "type": "boolean",
+        "question": "Rush Delivery Required",
+        "mandatory": false,
+        "default_value": false,
+        "help_text": "Check if you need expedited delivery (additional approval required)"
+      },
+      {
+        "name": "int_cost_center",
+        "type": "string",
+        "question": "Cost Center",
+        "mandatory": true,
+        "default_value": "{{user.cost_center}}",
+        "read_only": true
+      },
+      {
+        "name": "int_manager_approval",
+        "type": "reference",
+        "question": "Manager",
+        "reference": "sys_user",
+        "mandatory": true,
+        "default_value": "{{user.manager}}",
+        "read_only": true
+      }
+    ],
+    "workflow": {
+      "approval_required": true,
+      "approval_conditions": [
+        {
+          "condition": "req_laptop_type=executive OR opt_rush_delivery=true",
+          "approver": "int_manager_approval"
+        },
+        {
+          "condition": "req_laptop_type=developer",
+          "approver": "role:it_manager"
+        }
+      ]
+    },
+    "fulfillment": {
+      "assignment_group": "IT Hardware",
+      "auto_create_task": true,
+      "task_template": "laptop_provisioning"
+    },
+    "compliance_notes": {
+      "variable_count": 7,
+      "user_criteria_level": "item",
+      "performance_considerations": [
+        "Variables limited to essential fields only",
+        "Reference fields use indexed columns",
+        "Conditional logic minimizes form complexity"
+      ],
+      "limitations_addressed": [
+        "Under 100 variable limit",
+        "Item-level user criteria only",
+        "No custom widgets used",
+        "Standard ServiceNow components only"
+      ]
+    }
+  }
+}

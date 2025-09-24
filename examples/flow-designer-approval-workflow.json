@@ -1,0 +1,298 @@
+{
+  "flow": {
+    "name": "ESC Compliant Laptop Approval Workflow",
+    "description": "Approval workflow for laptop requests that complies with ServiceNow ESC limitations",
+    "trigger": {
+      "type": "record_created",
+      "table": "sc_req_item",
+      "conditions": [
+        {
+          "field": "cat_item.name",
+          "operator": "=",
+          "value": "Standard Laptop Request"
+        }
+      ]
+    },
+    "actions": [
+      {
+        "step": 1,
+        "name": "Initialize Request",
+        "type": "script",
+        "script": {
+          "description": "Initialize approval workflow with ESC compliance checks",
+          "code": [
+            "// ✅ COMPLIANT: Validate request meets ESC requirements",
+            "var requestItem = fd_data.trigger.current;",
+            "var catalogItem = requestItem.cat_item.getRefRecord();",
+            "",
+            "// Check variable count compliance",
+            "var variableCount = catalogItem.variables.getRowCount();",
+            "if (variableCount > 100) {",
+            "  fd_data.error = 'Catalog item exceeds ESC variable limit: ' + variableCount;",
+            "  return false;",
+            "}",
+            "",
+            "// ✅ COMPLIANT: Extract request variables efficiently",
+            "fd_data.laptop_type = requestItem.variables.req_laptop_type;",
+            "fd_data.rush_delivery = requestItem.variables.opt_rush_delivery;",
+            "fd_data.business_justification = requestItem.variables.req_business_justification;",
+            "fd_data.cost_center = requestItem.variables.int_cost_center;",
+            "fd_data.manager = requestItem.variables.int_manager_approval;",
+            "",
+            "// ✅ COMPLIANT: Log for compliance tracking",
+            "gs.info('ESC Approval Workflow initialized for request: ' + requestItem.number);",
+            "",
+            "return true;"
+          ]
+        }
+      },
+      {
+        "step": 2,
+        "name": "Determine Approval Path",
+        "type": "decision",
+        "conditions": [
+          {
+            "path": "executive_approval",
+            "condition": "fd_data.laptop_type == 'executive'",
+            "description": "Executive laptops require special approval"
+          },
+          {
+            "path": "rush_approval", 
+            "condition": "fd_data.rush_delivery == 'true'",
+            "description": "Rush delivery requires manager approval"
+          },
+          {
+            "path": "developer_approval",
+            "condition": "fd_data.laptop_type == 'developer'",
+            "description": "Developer workstations require IT manager approval"
+          },
+          {
+            "path": "auto_approve",
+            "condition": "fd_data.laptop_type == 'standard' && fd_data.rush_delivery != 'true'",
+            "description": "Standard requests can be auto-approved"
+          }
+        ]
+      },
+      {
+        "step": 3,
+        "name": "Executive Approval",
+        "type": "approval",
+        "path": "executive_approval",
+        "approval_config": {
+          "approver": "{{fd_data.manager}}",
+          "approval_timeout": 72,
+          "approval_timeout_action": "reject",
+          "approval_message": "Executive laptop request requires your approval",
+          "approval_details": {
+            "laptop_type": "{{fd_data.laptop_type}}",
+            "business_justification": "{{fd_data.business_justification}}",
+            "cost_center": "{{fd_data.cost_center}}"
+          }
+        },
+        "compliance_notes": [
+          "Uses manager reference from user profile",
+          "Timeout prevents indefinite pending approvals",
+          "All relevant details provided for approval decision"
+        ]
+      },
+      {
+        "step": 4,
+        "name": "Rush Delivery Approval", 
+        "type": "approval",
+        "path": "rush_approval",
+        "approval_config": {
+          "approver": "{{fd_data.manager}}",
+          "approval_timeout": 24,
+          "approval_timeout_action": "reject",
+          "approval_message": "Rush delivery laptop request requires approval",
+          "approval_details": {
+            "laptop_type": "{{fd_data.laptop_type}}",
+            "rush_delivery": "{{fd_data.rush_delivery}}",
+            "business_justification": "{{fd_data.business_justification}}"
+          }
+        }
+      },
+      {
+        "step": 5,
+        "name": "IT Manager Approval",
+        "type": "approval", 
+        "path": "developer_approval",
+        "approval_config": {
+          "approver_group": "IT Managers",
+          "approval_timeout": 48,
+          "approval_timeout_action": "reject",
+          "approval_message": "Developer workstation request requires IT approval",
+          "approval_details": {
+            "laptop_type": "{{fd_data.laptop_type}}",
+            "business_justification": "{{fd_data.business_justification}}",
+            "technical_requirements": "Development tools and elevated privileges"
+          }
+        },
+        "compliance_notes": [
+          "Uses group-based approval for scalability",
+          "Appropriate timeout for technical review",
+          "Includes technical context for IT managers"
+        ]
+      },
+      {
+        "step": 6,
+        "name": "Auto Approve Standard Request",
+        "type": "script",
+        "path": "auto_approve",
+        "script": {
+          "description": "Auto-approve standard laptop requests",
+          "code": [
+            "// ✅ COMPLIANT: Auto-approve with proper logging",
+            "var requestItem = fd_data.trigger.current;",
+            "requestItem.approval = 'approved';",
+            "requestItem.approval_history = 'Auto-approved: Standard laptop request';",
+            "requestItem.state = 2; // Approved state",
+            "requestItem.update();",
+            "",
+            "// ✅ COMPLIANT: Create fulfillment task",
+            "var task = new GlideRecord('sc_task');",
+            "task.initialize();",
+            "task.request_item = requestItem.sys_id;",
+            "task.short_description = 'Provision standard laptop';",
+            "task.description = 'Auto-approved laptop request - standard configuration';",
+            "task.assignment_group = 'IT Hardware';",
+            "task.priority = 3;",
+            "task.insert();",
+            "",
+            "gs.info('Auto-approved standard laptop request: ' + requestItem.number);"
+          ]
+        }
+      },
+      {
+        "step": 7,
+        "name": "Process Approval Result",
+        "type": "script",
+        "paths": ["executive_approval", "rush_approval", "developer_approval"],
+        "script": {
+          "description": "Process approval decision and create fulfillment tasks",
+          "code": [
+            "// ✅ COMPLIANT: Handle approval results efficiently",
+            "var requestItem = fd_data.trigger.current;",
+            "var approvalResult = fd_data.approval_result;",
+            "",
+            "if (approvalResult == 'approved') {",
+            "  // ✅ COMPLIANT: Create fulfillment task with proper assignment",
+            "  var task = new GlideRecord('sc_task');",
+            "  task.initialize();",
+            "  task.request_item = requestItem.sys_id;",
+            "  task.short_description = 'Provision ' + fd_data.laptop_type + ' laptop';",
+            "  task.description = 'Approved laptop request - ' + fd_data.laptop_type;",
+            "  task.assignment_group = 'IT Hardware';",
+            "  ",
+            "  // ✅ COMPLIANT: Set priority based on request type",
+            "  if (fd_data.rush_delivery == 'true') {",
+            "    task.priority = 1; // High priority for rush orders",
+            "  } else if (fd_data.laptop_type == 'executive') {",
+            "    task.priority = 2; // Medium-high for executive",
+            "  } else {",
+            "    task.priority = 3; // Normal priority",
+            "  }",
+            "  ",
+            "  task.insert();",
+            "  ",
+            "  // ✅ COMPLIANT: Update request item status",
+            "  requestItem.state = 2; // Work in Progress",
+            "  requestItem.update();",
+            "  ",
+            "  // ✅ COMPLIANT: Send notification to requestor",
+            "  gs.eventQueue('laptop.request.approved', requestItem, ",
+            "    requestItem.requested_for, requestItem.opened_by);",
+            "    ",
+            "} else if (approvalResult == 'rejected') {",
+            "  // ✅ COMPLIANT: Handle rejection properly",
+            "  requestItem.state = 4; // Cancelled",
+            "  requestItem.close_notes = 'Request rejected during approval process';",
+            "  requestItem.update();",
+            "  ",
+            "  // ✅ COMPLIANT: Send rejection notification",
+            "  gs.eventQueue('laptop.request.rejected', requestItem,",
+            "    requestItem.requested_for, requestItem.opened_by);",
+            "}",
+            "",
+            "// ✅ COMPLIANT: Log workflow completion",
+            "gs.info('Laptop approval workflow completed for: ' + requestItem.number + ",
+            "         ' Result: ' + approvalResult);"
+          ]
+        }
+      },
+      {
+        "step": 8,
+        "name": "Workflow Completion",
+        "type": "script",
+        "script": {
+          "description": "Complete workflow with compliance tracking",
+          "code": [
+            "// ✅ COMPLIANT: Record workflow metrics for monitoring",
+            "var requestItem = fd_data.trigger.current;",
+            "var workflowEnd = new GlideDateTime();",
+            "var workflowStart = new GlideDateTime(requestItem.sys_created_on);",
+            "var processingTime = GlideDateTime.subtract(workflowStart, workflowEnd);",
+            "",
+            "// ✅ COMPLIANT: Log performance metrics",
+            "gs.info('ESC Workflow Performance - Request: ' + requestItem.number +",
+            "         ' Processing Time: ' + processingTime.getDisplayValue());",
+            "",
+            "// ✅ COMPLIANT: Alert on slow processing",
+            "if (processingTime.getNumericValue() > 86400000) { // 24 hours",
+            "  gs.warn('ESC Workflow exceeded performance threshold: ' + ",
+            "          requestItem.number);",
+            "}",
+            "",
+            "// ✅ COMPLIANT: Update compliance tracking",
+            "var complianceRecord = new GlideRecord('u_esc_compliance_tracking');",
+            "complianceRecord.initialize();",
+            "complianceRecord.request_item = requestItem.sys_id;",
+            "complianceRecord.workflow_name = 'ESC Compliant Laptop Approval';",
+            "complianceRecord.processing_time = processingTime.getDisplayValue();",
+            "complianceRecord.approval_path = fd_data.approval_path;",
+            "complianceRecord.variable_count = fd_data.variable_count;",
+            "complianceRecord.compliance_status = 'compliant';",
+            "complianceRecord.insert();"
+          ]
+        }
+      }
+    ],
+    "error_handling": {
+      "on_error": "script",
+      "error_script": [
+        "// ✅ COMPLIANT: Comprehensive error handling",
+        "var requestItem = fd_data.trigger.current;",
+        "var errorMessage = fd_data.error || 'Unknown workflow error';",
+        "",
+        "// ✅ COMPLIANT: Log error for troubleshooting",
+        "gs.error('ESC Workflow Error - Request: ' + requestItem.number + ",
+        "         ' Error: ' + errorMessage);",
+        "",
+        "// ✅ COMPLIANT: Set request to error state",
+        "requestItem.state = 10; // Cancelled due to error",
+        "requestItem.close_notes = 'Workflow error: ' + errorMessage;",
+        "requestItem.update();",
+        "",
+        "// ✅ COMPLIANT: Notify support team",
+        "gs.eventQueue('workflow.error', requestItem, 'it.support@company.com');"
+      ]
+    },
+    "compliance_features": {
+      "variable_count_validation": "Enforces ESC 100-variable limit",
+      "performance_monitoring": "Tracks and alerts on slow processing",
+      "audit_logging": "Comprehensive logging for compliance",
+      "error_handling": "Robust error handling and recovery",
+      "timeout_management": "Prevents indefinite pending states",
+      "role_based_approval": "Uses ServiceNow roles and groups",
+      "notification_system": "Proper user communication"
+    },
+    "limitations_addressed": [
+      "Item Designer approval limitations bypassed with Flow Designer",
+      "Complex approval logic implemented outside catalog item",
+      "Performance monitoring and optimization included",
+      "Proper error handling for production reliability",
+      "Scalable group-based approvals instead of individual users",
+      "Comprehensive logging for audit and troubleshooting"
+    ]
+  }
+}
