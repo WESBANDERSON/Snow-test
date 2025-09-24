@@ -6,10 +6,10 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
-    "build:prod": "ng build --configuration production --base-href=/servicenow-esc-replica/",
+    "build:prod": "ng build --configuration production --base-href=/Snow-test/",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "deploy": "ng deploy --base-href=/servicenow-esc-replica/"
+    "deploy": "ng deploy --base-href=/Snow-test/"
   },
   "dependencies": {
     "@angular/animations": "^17.0.0",
