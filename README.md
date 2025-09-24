@@ -1,5 +1,7 @@
 # ServiceNow ESC Replica
 
+[![Deploy to GitHub Pages](https://github.com/WESBANDERSON/Snow-test/actions/workflows/deploy.yml/badge.svg)](https://github.com/WESBANDERSON/Snow-test/actions/workflows/deploy.yml)
+
 A modern, clean ServiceNow Employee Service Center replica built with Angular and styled with Radix UI-inspired components. This project replicates the core functionality and user experience of ServiceNow ESC while pushing the styling boundaries to create a sleek, modern interface.
 
 ## ✨ Features
